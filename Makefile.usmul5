@@ -1,0 +1,36 @@
+SHELL = /bin/bash
+
+SIM_DIR = sim
+
+VERILATOR = verilator
+
+VERILATOR_OPTS = \
+	-Wall \
+	-Wno-WIDTH \
+	-Wno-UNUSED \
+	-Wno-BLKSEQ \
+	--cc \
+	+1364-2001ext+v \
+	-Wno-fatal \
+	--Mdir sim \
+	--trace \
+
+VERILATOR_MAKE_OPTS = OPT_FAST="-O3"
+
+MAX_CYCLES = 100
+
+DESIGN_SRCS = \
+mul5.v \
+
+VERILATOR_CPP_TB = usmul5_tb.cpp
+
+default: $(SIM_DIR)/Vmul5
+
+sim: $(SIM_DIR)/Vmul5
+
+$(SIM_DIR)/Vmul5: $(DESIGN_SRCS) $(VERILATOR_CPP_TB)
+	$(VERILATOR) $(VERILATOR_OPTS) $(DESIGN_SRCS) --exe ../$(VERILATOR_CPP_TB)
+	cd sim; make $(VERILATOR_MAKE_OPTS) -f Vmul5.mk Vmul5__ALL.a
+	cd sim; make $(VERILATOR_MAKE_OPTS) -f Vmul5.mk Vmul5
+
+.PHONY:
