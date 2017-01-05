@@ -1,24 +1,27 @@
 module booth
   (
    input         i,
+   input         x_signed,
    input [2:0]   br,
    input [31:0]  x,
    output [35:0] bx
    );
 
+   assign S = ((br==3'b000)|(br==3'b111)) ? 1'b0 : (x[31]&x_signed)^br[2] ;
+
    always @(*) begin
       case(br)
         3'b000: bx[32:0] =  {33{1'b0}};
-        3'b001: bx[32:0] =  {x[31],x[31:0]};
-        3'b010: bx[32:0] =  {x[31],x[31:0]};
+        3'b001: bx[32:0] =  {x[31]&x_signed,x[31:0]};
+        3'b010: bx[32:0] =  {x[31]&x_signed,x[31:0]};
         3'b011: bx[32:0] =  {x[31:0],1'b0};
         3'b100: bx[32:0] = ~{x[31:0],1'b0};
-        3'b101: bx[32:0] = ~{x[31],x[31:0]};
-        3'b110: bx[32:0] = ~{x[31],x[31:0]};
+        3'b101: bx[32:0] = ~{x[31]&x_signed,x[31:0]};
+        3'b110: bx[32:0] = ~{x[31]&x_signed,x[31:0]};
         3'b111: bx[32:0] =  {33{1'b0}};
       endcase
-      if(i) bx[35:33] = {2'b01,~bx[32]};
-      else  bx[35:33] = {~bx[32],bx[32],bx[32]};
+      if(i) bx[35:33] = {2'b01,~S};
+      else  bx[35:33] = {~S,S,S};
    end
 endmodule
 
@@ -26,6 +29,8 @@ module mul5
   (
    input         clk,
    input         reset,
+   input         x_signed,
+   input         y_signed,
    input [31:0]  x,
    input [31:0]  y,
    output [31:0] mh,
@@ -58,12 +63,12 @@ module mul5
 //   wire          ng5 = (br5[2:1]==2'b10)|(br5[2:0]==3'b110);
    reg           ng5;
 
-   booth booth0(.i(0), .br(br0), .x(x), .bx(bx0));
-   booth booth1(.i(1), .br(br1), .x(x), .bx(bx1));
-   booth booth2(.i(1), .br(br2), .x(x), .bx(bx2));
-   booth booth3(.i(1), .br(br3), .x(x), .bx(bx3));
-   booth booth4(.i(1), .br(br4), .x(x), .bx(bx4));
-   booth booth5(.i(1), .br(br5), .x(x), .bx(bx5));
+   booth booth0(.i(0), .x_signed(x_signed), .br(br0), .x(x), .bx(bx0));
+   booth booth1(.i(1), .x_signed(x_signed), .br(br1), .x(x), .bx(bx1));
+   booth booth2(.i(1), .x_signed(x_signed), .br(br2), .x(x), .bx(bx2));
+   booth booth3(.i(1), .x_signed(x_signed), .br(br3), .x(x), .bx(bx3));
+   booth booth4(.i(1), .x_signed(x_signed), .br(br4), .x(x), .bx(bx4));
+   booth booth5(.i(1), .x_signed(x_signed), .br(br5), .x(x), .bx(bx5));
 
    always @ (posedge clk) begin
       if(reset) begin
@@ -106,7 +111,10 @@ module mul5
            end
          endcase
          i<=i+1;
-         sy<={{4{sy[31]}},sy[31:4]};
+         if(y_signed)
+           sy<={{4{sy[31]}},sy[31:4]};
+         else
+           sy<={4'h0       ,sy[31:4]};
       end
    end
 

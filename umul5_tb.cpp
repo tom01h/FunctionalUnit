@@ -16,7 +16,7 @@ int main(int argc, char **argv, char **env) {
   int i, nloop;
   char vcdfile[VCD_PATH_LENGTH];
 
-  int64_t m;
+  uint64_t m;
   int mh, ml;
 
   strncpy(vcdfile,"tmp.vcd",VCD_PATH_LENGTH);
@@ -44,8 +44,8 @@ int main(int argc, char **argv, char **env) {
   verilator_top->trace(tfp, 99); // requires explicit max levels param
   tfp->open(vcdfile);
   vluint64_t main_time = 0;
-  verilator_top->x_signed = 1;
-  verilator_top->y_signed = 1;
+  verilator_top->x_signed = 0;
+  verilator_top->y_signed = 0;
   verilator_top->x = x;
   verilator_top->y = y;
   //  while (!Verilated::gotFinish()) {
@@ -54,7 +54,7 @@ int main(int argc, char **argv, char **env) {
     if((main_time>0)&((main_time%1000)==0)){
       mh = verilator_top->mh;
       ml = verilator_top->ml;
-      m=(int64_t)x*(int64_t)y;
+      m=(int64_t)(unsigned)x*(int64_t)(unsigned)y;
       if(((int)(m>>32)==mh) & (((int)m)==ml)){
         printf("PASSED %04d : %08x * %08x = %08x_%08x\n",i,x,y,mh,ml);
       }else{
