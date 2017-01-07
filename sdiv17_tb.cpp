@@ -29,6 +29,8 @@ int main(int argc, char **argv, char **env) {
   }else{
     x = (rand()<<1)^rand();
     y = (rand()<<1)^rand();
+    y = y>>(rand()%30);
+    if(y==0){y=rand();}
     if(argc==2){
       nloop = atoi(argv[1]);
     }else{
@@ -60,6 +62,8 @@ int main(int argc, char **argv, char **env) {
       }
       x = (rand()<<1)^rand();
       y = (rand()<<1)^rand();
+      y = y>>(rand()%30);
+      if(y==0){y=rand();}
       verilator_top->x = x;
       verilator_top->y = y;
       i++;
