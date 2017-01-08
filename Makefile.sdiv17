@@ -19,6 +19,7 @@ VERILATOR_MAKE_OPTS = OPT_FAST="-O3"
 
 DESIGN_SRCS = \
 div17.v \
+vscale_mul_div.v \
 
 VERILATOR_CPP_TB = sdiv17_tb.cpp
 
@@ -30,5 +31,8 @@ $(SIM_DIR)/Vdiv17: $(DESIGN_SRCS) $(VERILATOR_CPP_TB)
 	$(VERILATOR) $(VERILATOR_OPTS) $(DESIGN_SRCS) --exe ../$(VERILATOR_CPP_TB)
 	cd sim; make $(VERILATOR_MAKE_OPTS) -f Vdiv17.mk Vdiv17__ALL.a
 	cd sim; make $(VERILATOR_MAKE_OPTS) -f Vdiv17.mk Vdiv17
+
+clean:
+	rm -rf sim/ tmp.vcd
 
 .PHONY:

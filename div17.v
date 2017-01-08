@@ -1,7 +1,10 @@
+`include "vscale_md_constants.vh"
+
 module div17
   (
    input             clk,
    input             reset,
+   input             req,
    input             x_signed,
    input             y_signed,
    input [31:0]      x,
@@ -10,7 +13,25 @@ module div17
    output [31:0]     r
    );
 
-   reg [31:0]    xh, xl;
+   vscale_mul_div mul_div
+     (
+      .clk(clk),
+      .reset(reset),
+      .req_valid(req),
+      .req_ready(),
+      .req_in_1_signed(x_signed),
+      .req_in_2_signed(y_signed),
+      .req_op(`MD_OP_DIV),
+      .req_out_sel(`MD_OUT_HI),
+      .req_in_1(x),
+      .req_in_2(y),
+      .resp_valid(),
+      .resp_result(q)
+      );
+
+   assign r = mul_div.buf1;
+
+/*   reg [31:0]    xh, xl;
    reg [32:0]    tmp1, tmp2, tmp3;
    wire          sign = x[31]&x_signed;
    wire          plus = (x[31]&x_signed)^(y[31]&y_signed);
@@ -42,7 +63,7 @@ module div17
          tmp3[32] <= ~sign;
          tmp2[32] <= ~sign;
          tmp1[32] <= ~sign;
-      end else if((i>1)|(i>0)&(~x_signed)&(~y_signed))begin
+      end else if((i>1)|(i>0)&(~x_signed))begin
          q[31:2] <= q[29:0]|dq;
          xh <= {sxh[29:0],xl[31:30]};
          xl <= {xl[29:0],2'b00};
@@ -83,5 +104,5 @@ module div17
       end
    end
    assign r = xh;
-
+*/
 endmodule

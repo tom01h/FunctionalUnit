@@ -50,7 +50,8 @@ int main(int argc, char **argv, char **env) {
   verilator_top->y = y;
   //  while (!Verilated::gotFinish()) {
   while (i<nloop) {
-    verilator_top->reset = ((main_time%1000) < 200) ? 1 : 0;
+    verilator_top->reset = ((main_time%1000) < 100) ? 1 : 0;
+    verilator_top->req   = ((main_time%1000) < 200) ? 1 : 0;
     if((main_time>0)&((main_time%1000)==0)){
       mh = verilator_top->mh;
       ml = verilator_top->ml;

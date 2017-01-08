@@ -1,4 +1,6 @@
-module booth
+`include "vscale_md_constants.vh"
+
+/* module booth
   (
    input         i,
    input         x_signed,
@@ -23,12 +25,13 @@ module booth
       if(i) bx[35:33] = {2'b01,~S};
       else  bx[35:33] = {~S,S,S};
    end
-endmodule
+endmodule */
 
 module mul5
   (
    input         clk,
    input         reset,
+   input         req,
    input         x_signed,
    input         y_signed,
    input [31:0]  x,
@@ -37,7 +40,25 @@ module mul5
    output [31:0] ml
    );
 
-   reg [50:18]   ms;
+vscale_mul_div mul_div
+  (
+   .clk(clk),
+   .reset(reset),
+   .req_valid(req),
+   .req_ready(),
+   .req_in_1_signed(x_signed),
+   .req_in_2_signed(y_signed),
+   .req_op(`MD_OP_MUL),
+   .req_out_sel(`MD_OUT_LO),
+   .req_in_1(x),
+   .req_in_2(y),
+   .resp_valid(),
+   .resp_result(ml)
+   );
+
+   assign mh = mul_div.m[63:32];
+
+/*   reg [50:18]   ms;
    reg [64:0]    m;
 
    reg [31:0]    sy;
@@ -120,5 +141,5 @@ module mul5
 
    assign mh = m[63:32];
    assign ml = m[31:0];
-
+*/
 endmodule
