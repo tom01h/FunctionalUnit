@@ -56,7 +56,11 @@ int main(int argc, char **argv, char **env) {
     if((main_time>0)&((main_time%2000)==0)){
       q = verilator_top->q;
       r = verilator_top->r;
-      if((q==x/y) & (r==x%y)){
+      if(y==0){
+        printf("DIVBy0 %04d : %d / %d = %d ... %d\n",i,x,y,q,r);
+      }else if((x==0x80000000) & (y==-1)){
+        printf("OVFlow %04d : %d / %d = %d ... %d\n",i,x,y,q,r);
+      }else if((q==x/y) & (r==x%y)){
         printf("PASSED %04d : %d / %d = %d ... %d\n",i,x,y,q,r);
       }else{
         printf("FAILED %04d : %d / %d = %d ... %d != %d ... %d\n",i,x,y,x/y,x%y,q,r);

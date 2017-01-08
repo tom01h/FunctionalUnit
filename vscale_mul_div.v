@@ -140,7 +140,30 @@ module vscale_mul_div
            end
          endcase
       end else begin // DIV
-         if((i>2)|(i>1)&(~x_signed))begin
+         if(y==0) begin
+            in00 = {x_signed&sxh[30],sxh[30:0],xl[31]};
+            in01 = {y_signed&y[31],y[31:0]}^{33{~plus}};
+            in02 = {33{sign}};
+            if(x_signed) begin
+               in10 = {xh[0],xl[31:1]};
+            end else begin
+               in10 = xl[31:0];
+            end
+            in11 = ({33{1'b0}});
+            in12 = ({33{1'b0}});
+            in20 = ({33{1'b0}});
+            in21 = ({33{1'b1}});
+            in22 = ({33{1'b0}});
+            if(plus) begin
+               in0v = 2'b00;
+               in1v = 2'b00;
+               in2v = 2'b00;
+            end else begin
+               in0v = 2'b00;
+               in1v = 2'b00;
+               in2v = 2'b00;
+            end
+         end else if((i>2)|(i>1)&(~x_signed))begin
             in00 = {x_signed&sxh[29],sxh[29:0],xl[31:30]};
             in01 = {y_signed&y[31],y[31:0]}^{33{~plus}};
             in02 = 33'h000000000;
@@ -255,6 +278,12 @@ module vscale_mul_div
            xh<={{4{xh[31]}},xh[31:4]};
          else
            xh<={4'h0       ,xh[31:4]};
+      end else if(y==0) begin // DIV
+         if(i>0)
+           resp_valid <= 1'b1;
+         else
+           resp_valid <= 1'b0;
+         i <= 0;
       end else if((i>2)|(i>1)&(~x_signed))begin // DIV
          q[31:2] <= q[29:0]|dq;
          xh <= {sxh[29:0],xl[31:30]};
