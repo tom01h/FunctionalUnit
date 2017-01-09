@@ -96,7 +96,7 @@ module vscale_mul_div
          in0v = 2'b00;
          in1v = 2'b00;
          in2v = 2'b00;
-         in01[32] = 1'b0; in11[32] = 1'b0; in21[32] = 1'b0;
+         in10[32] = 1'b0; in11[32] = 1'b0; in12[32] = 1'b0;
          case(i)
            5: begin
               in00[32:0] = {3'b000,by0[35:18],ms[33:22]};
@@ -122,20 +122,12 @@ module vscale_mul_div
               {in21[32:0],in11[31:0]} = {1'b0,by4[31:0],1'b0,ng5,  by1[15:0],1'b0,ng2      ,4'h0,8'h00};
               {in22[32:0],in12[31:0]} = {           1'b0,ng4,2'b00,by2[13:0],1'b0,ng1,2'b00,4'h0,8'h00};
            end
-           1: begin
+           default: begin // 1
               in00[32:0] = {3'b000,ms[50],~ms[50],ms[49:34],ms[33:22]};
               in01[32:0] = {1'b0,by1[35:16],12'h000};
               in02[32:0] = {1'b0,by2[33:14],12'h000};
               {in20[32:0],in10[31:0]} = {1'b0, m[63:0]};
               {in21[32:0],in11[31:0]} = {1'b0,ms[50],~ms[50],ms[49:18],1'b0,ng2,16'h0000};
-              {in22[32:0],in12[31:0]} = 32'h00000000;
-           end
-           default: begin
-              in00[32:0] = {3'b000,ms[50],~ms[50],ms[49:34],ms[33:22]};
-              in01[32:0] = {1'b0,by1[35:16],12'h000};
-              in02[32:0] = {1'b0,by2[33:14],12'h000};
-              {in20[32:0],in10[31:0]} = {1'b0, m[63:0]};
-              {in21[32:0],in11[31:0]} = 32'h00000000;
               {in22[32:0],in12[31:0]} = 32'h00000000;
            end
          endcase
@@ -201,7 +193,8 @@ module vscale_mul_div
                in1v = 2'b01;
                in2v = 2'b11;
             end
-         end else if(i==1)begin
+//         end else if(i==1)begin
+         end else begin
             in00 = {x_signed&sxh[30],sxh[30:0],xl[31]};
             in01 = {y_signed&y[31],y[31:0]}^{33{~plus}};
             in02 = {33{sign}};
@@ -243,9 +236,11 @@ module vscale_mul_div
 
    always @ (posedge clk) begin
       resp_valid <= 1'b0;
-      buf2 <= out2;
-      buf1 <= out1;
-      buf0 <= out0;
+      if(~req_ready) begin
+         buf2 <= out2;
+         buf1 <= out1;
+         buf0 <= out0;
+      end
       if(reset) begin
          i<=0;
       end else if(req_valid & req_ready) begin
