@@ -10,11 +10,16 @@ typedef union {
     int l;
     int u;
   };
+} dr;
+typedef union {
+  float f;
+  int i;
 } fr;
 
 int main(int argc, char *args[])
 {
-  fr xf, yf, tf;
+  dr xf, yf, tf;
+  fr rr;
   int xi, yi, ri, ai, xe, ye;
   int xn, yn;
   int i;
@@ -79,6 +84,8 @@ int main(int argc, char *args[])
     r=sqrt(x*x+y*y);
   }//r FIX VAL
   printf("sqrt(x^2+y^2) = %f\n",xi*tf.f/(1<<29)/r);
+  rr.f=1/r;
+  printf("r = %x\n",rr.i);
 
   return 0;
 }
