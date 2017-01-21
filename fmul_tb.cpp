@@ -1,6 +1,6 @@
 #include "unistd.h"
 #include "getopt.h"
-#include "Vfadd.h"
+#include "Vfmul.h"
 #include "verilated.h"
 #include "verilated_vcd_c.h"
 #include <stdio.h>
@@ -41,7 +41,7 @@ int main(int argc, char **argv, char **env) {
   Verilated::commandArgs(argc, argv);
   Verilated::traceEverOn(true);
   VerilatedVcdC* tfp = new VerilatedVcdC;
-  Vfadd* verilator_top = new Vfadd;
+  Vfmul* verilator_top = new Vfmul;
   verilator_top->trace(tfp, 99); // requires explicit max levels param
   tfp->open(vcdfile);
   vluint64_t main_time = 0;
@@ -51,11 +51,11 @@ int main(int argc, char **argv, char **env) {
     verilator_top->req   = ((main_time%1000) < 200) ? 1 : 0;
     if((main_time>0)&((main_time%1000)==0)){
       rslt.i = verilator_top->rslt;
-      expect.f = x.f + y.f;
+      expect.f = x.f * y.f;
       if(expect.i==rslt.i){
-        printf("PASSED %04d : %08x + %08x = %08x\n",i,x.i,y.i,rslt.i);
+        printf("PASSED %04d : %08x * %08x = %08x\n",i,x.i,y.i,rslt.i);
       }else{
-        printf("FAILED %04d : %08x + %08x = %08x != %08x\n",i,x.i,y.i,expect.i,rslt.i);
+        printf("FAILED %04d : %08x * %08x = %08x != %08x\n",i,x.i,y.i,expect.i,rslt.i);
       }
       i++;
     }
@@ -65,10 +65,7 @@ int main(int argc, char **argv, char **env) {
         y.i = (rand()<<1)^rand();
         xe = (x.i>>23)&0xff;
         //xe = rand()%32;  // for subnormal test
-        ye = rand()%32;
-        //ye = rand()%3;   // for normalize test
-        if(y.i&0x80){ye=xe+(ye);}
-        else        {ye=xe-(ye);}
+        ye = rand()%64 - 32 + 128;
         if(xe<0){xe=0;}
         if(xe>254){xe=254;}
         x.i = x.i&0x807fffff|(xe<<23);

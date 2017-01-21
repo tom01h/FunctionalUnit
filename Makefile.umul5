@@ -19,7 +19,6 @@ VERILATOR_MAKE_OPTS = OPT_FAST="-O3"
 
 DESIGN_SRCS = \
 mul5.v \
-vscale_mul_div.v \
 
 VERILATOR_CPP_TB = umul5_tb.cpp
 

@@ -83,6 +83,6 @@ module fadd
                             : ((grsn[1:0]==2'b00)|                          // inc
                                ((grsn[1]^grsn[0])     &(grsn[0]))|          // rs=11
                                ((grsn[2]^(|grsn[1:0]))&(grsn[1]^grsn[0]))); // gr=11
-   assign expn = expr-nrmsft+(nrmi[28]^nrm4[27]); // subnrmal or not
+   assign expn = expr-nrmsft+(nrmi[28]^nrm4[27]); // subnormal(+0) or normal(+1)
 
 endmodule

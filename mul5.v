@@ -1,6 +1,6 @@
 `include "vscale_md_constants.vh"
 
-/* module booth
+ module booth
   (
    input         i,
    input         x_signed,
@@ -25,7 +25,7 @@
       if(i) bx[35:33] = {2'b01,~S};
       else  bx[35:33] = {~S,S,S};
    end
-endmodule */
+endmodule
 
 module mul5
   (
@@ -40,7 +40,7 @@ module mul5
    output [31:0] ml
    );
 
-vscale_mul_div mul_div
+/* vscale_mul_div mul_div
   (
    .clk(clk),
    .reset(reset),
@@ -57,8 +57,8 @@ vscale_mul_div mul_div
    );
 
    assign mh = mul_div.m[63:32];
-
-/*   reg [50:18]   ms;
+*/
+   reg [46:14]   ms;
    reg [64:0]    m;
 
    reg [31:0]    sy;
@@ -68,9 +68,9 @@ vscale_mul_div mul_div
    wire [2:0]    br0 = {sy[1:0],1'b0};
    wire [2:0]    br1 = sy[3:1];
    wire [2:0]    br2 = sy[5:3];
-   wire [2:0]    br3 = sy[19:17];
-   wire [2:0]    br4 = sy[21:19];
-   wire [2:0]    br5 = sy[23:21];
+   wire [2:0]    br3 = sy[15:13];
+   wire [2:0]    br4 = sy[17:15];
+   wire [2:0]    br5 = sy[19:17];
 
    wire [35:0]   bx0, bx1, bx2;
    wire [35:0]   bx3, bx4, bx5;
@@ -83,6 +83,7 @@ vscale_mul_div mul_div
    wire          ng4 = (br4[2:1]==2'b10)|(br4[2:0]==3'b110);
 //   wire          ng5 = (br5[2:1]==2'b10)|(br5[2:0]==3'b110);
    reg           ng5;
+   wire          ng16 = 1'b0;
 
    booth booth0(.i(0), .x_signed(x_signed), .br(br0), .x(x), .bx(bx0));
    booth booth1(.i(1), .x_signed(x_signed), .br(br1), .x(x), .bx(bx1));
@@ -92,43 +93,41 @@ vscale_mul_div mul_div
    booth booth5(.i(1), .x_signed(x_signed), .br(br5), .x(x), .bx(bx5));
 
    always @ (posedge clk) begin
-      if(reset) begin
+      if(reset|req) begin
          i<=0;
          sy<=y;
-      end
-//      else if (i>10)
-//        $finish;
-      else begin
+      end else begin
          ng2 <= (br2[2:1]==2'b10)|(br2[2:0]==3'b110);
-         ng5 <= (br5[2:1]==2'b10)|(br5[2:0]==3'b110);
+         if(i!=3)
+           ng5 <= (br5[2:1]==2'b10)|(br5[2:0]==3'b110);
+         else
+           ng5 <= (br4[2:1]==2'b10)|(br4[2:0]==3'b110);
          case(i)
            0: begin
-              ms[50:30] <= {3'b000,bx0[35:18]}+{1'b0,bx1[35:16]}+{1'b0,bx2[33:14]};
-              ms[29:18] <= ms[33:22];
-              m[64:8] <= {3'b000,bx3[35:0],            bx0[17:0]}+
-                         {1'b0,bx4[35:0],1'b0,ng3,      bx1[15:0],1'b0,ng0}+
-                         {1'b0,bx5[33:0],1'b0,ng4,2'b00,bx2[13:0],1'b0,ng1,2'b00};
-              m[7:0]  <= m[11:4];
+              ms[46:22] <= {3'b000,bx0[35:14]}+{1'b0,bx1[35:12]}+{1'b0,bx2[33:10]} + {ng16,{18{1'b0}}};
+              ms[21:14] <= 8'h00;
+              m[64:8] <= {7'h00,bx3[35:0],               bx0[13:0]}+
+                         {5'h00,bx4[35:0],1'b0,ng3,      bx1[11:0],1'b0,ng0}+
+                         {3'h0 ,bx5[35:0],1'b0,ng4,2'b00,bx2[ 9:0],1'b0,ng1,2'b00};
+              m[7:0]  <= 8'h00;
            end
            1,2: begin
-              ms[50:30] <= {3'b000,ms[50],~ms[50],ms[49:34]}+{1'b0,bx1[35:16]}+{1'b0,bx2[33:14]};
-              ms[29:18] <= ms[33:22];
+              ms[46:22] <= {3'b000,ms[46],~ms[46],ms[45:26]}+{1'b0,bx1[35:12]}+{1'b0,bx2[33:10]};
+              ms[21:14] <= ms[25:18];
               m[64:8] <= {3'b000, m[64], ~m[64], m[63:12]}+
-                         {1'b0,bx4[35:0],1'b0,ng5,      bx1[15:0],1'b0,ng2}+
-                         {1'b0,bx5[33:0],1'b0,ng4,2'b00,bx2[13:0],1'b0,ng1,2'b00};
+                         {5'h00,bx4[35:0],1'b0,ng5,      bx1[11:0],1'b0,ng2}+
+                         {3'h0 ,bx5[33:0],1'b0,ng4,2'b00,bx2[ 9:0],1'b0,ng1,2'b00};
               m[7:0]  <= m[11:4];
            end
            3: begin
-              ms[50:30] <= {3'b000,ms[50],~ms[50],ms[49:34]}+{1'b0,bx1[35:16]}+{1'b0,bx2[33:14]};
-              ms[29:18] <= ms[33:22];
-
-              m[64:8] <= {1'b0, m[63:8]}+
-                         {1'b0,bx4[31:0],1'b0,ng5,  bx1[15:0],1'b0,ng2      ,4'h0}+
-                         {           1'b0,ng4,2'b00,bx2[13:0],1'b0,ng1,2'b00,4'h0};
-              m[7:0]  <= m[7:0];
+              m[64:0] <= m[64:0]+
+                         {1'b0,bx4[35:0],1'b0,ng5,26'h0}+
+                         {       ms[46], ~ms[46], ms[45:14],1'b0,ng2,12'h0000};
            end
            4: begin
-              m[64:0] <= {1'b0,m[63:0]}+{ms[50],~ms[50],ms[49:18],1'b0,ng2,16'h00000};
+              m[64:0] <= m[64:0]+
+                         {1'b0,bx3[33:0],1'b0,ng5,28'h0}+
+                         {1'b0,bx4[31:0],1'b0,ng3,30'h0};
            end
          endcase
          i<=i+1;
@@ -141,5 +140,5 @@ vscale_mul_div mul_div
 
    assign mh = m[63:32];
    assign ml = m[31:0];
-*/
+
 endmodule
