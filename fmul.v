@@ -157,7 +157,7 @@ module fmul
               end else begin
                  rslt[30:0] = {expn,nrm0[54:32]}+rnd;
                  flag[0] = |grsn[1:0];
-                 flag[1] = (expn==0)&(flag[0]);
+                 flag[1] = (rslt[30:23]==8'h00)&(flag[0]);
                  flag[2] = (rslt[30:23]==8'hff);
               end
            end

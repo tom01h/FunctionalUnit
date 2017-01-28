@@ -80,7 +80,7 @@ module fadd
             end else begin
                rslt[30:0] = {expn,nrm4[26:4]}+rnd;
                flag[0]=|grsn[1:0];
-               flag[1]=(expn==0)&(flag[0]);
+               flag[1]=(rslt[30:23]==8'h00)&(flag[0]);
                flag[2]=(rslt[30:23]==8'hff);
             end
             rslt[31] = sgn1;
@@ -88,7 +88,7 @@ module fadd
             rslt[30:0] = {expn,~nrm4[26:4]}+rnd;
             rslt[31] = ~sgn1;
             flag[0]=|grsn[1:0];
-            flag[1]=(expn==0)&(flag[0]);
+            flag[1]=(rslt[30:23]==8'h00)&(flag[0]);
          end
          i <= 0;
       end
