@@ -5,13 +5,14 @@ module fadd
    input         req,
    input [31:0]  x,
    input [31:0]  y,
-   output [31:0] rslt
+   output [31:0] rslt,
+   output [4:0]  flag
    );
 
    reg           sgn1, sgn0;
    reg [7:0]     expr, expd;
    reg [23:0]    frac1, frac0;
-   reg [24:0]    guard;
+   reg [26:0]    guard;
    reg [25:0]    fracr;
 
    wire [25+3:0] nrmi,nrm0,nrm1,nrm2,nrm3,nrm4;
@@ -42,29 +43,58 @@ module fadd
          end
          i <= 2;
       end else if(i==2) begin
-         if(expd>=25)
-           if(sgn0^sgn1) {fracr,guard} <= {frac1,25'h0}-({frac0,25'h0}>>25);
-           else          {fracr,guard} <= {frac1,25'h0}+({frac0,25'h0}>>25);
+         if(expd>=27)
+           if(sgn0^sgn1) {fracr,guard} <= {frac1,27'h0}-({frac0,27'h0}>>27);
+           else          {fracr,guard} <= {frac1,27'h0}+({frac0,27'h0}>>27);
          else
-           if(sgn0^sgn1) {fracr,guard} <= {frac1,25'h0}-({frac0,25'h0}>>expd);
-           else          {fracr,guard} <= {frac1,25'h0}+({frac0,25'h0}>>expd);
+           if(sgn0^sgn1) {fracr,guard} <= {frac1,27'h0}-({frac0,27'h0}>>expd);
+           else          {fracr,guard} <= {frac1,27'h0}+({frac0,27'h0}>>expd);
          i <= 1;
       end else if(i==1) begin
-         if(~nrmi[28])begin
-            if((expr[7:1]==7'h7f)&(nrmi[27]))
-              rslt[30:0] <= 31'h7f800000;
-            else
-              rslt[30:0] <= {expn,nrm4[26:4]}+rnd;
-            rslt[31] <= sgn1;
+         flag=0;
+         if((x[30:23]==8'hff)&(x[22:0]!=0))begin
+            rslt = x|32'h00400000;
+            flag[4]=~x[22]|((y[30:23]==8'hff)&~y[22]&(y[21:0]!=0));
+         end else if((y[30:23]==8'hff)&(y[22:0]!=0))begin
+            rslt = y|32'h00400000;
+            flag[4]=~y[22]|((x[30:23]==8'hff)&~x[22]&(x[21:0]!=0));
+         end else if((x[30:23]==8'hff)&(y[30:23]==8'hff))begin
+            if(x[31]^y[31])begin
+               rslt[31:0] = 32'hffc00000;
+               flag[4]=1'b1;
+            end else begin
+               rslt[31:0] = x;
+            end
+         end else if(x[30:23]==8'hff)begin
+            rslt[31:0] = x;
+         end else if(y[30:23]==8'hff)begin
+            rslt[31:0] = y;
+         end else if({fracr,guard}==0)begin
+            rslt[31:0] = {x[31]&y[31],31'h0};
+         end else if(~nrmi[28])begin
+            flag[0]=|grsn[1:0];
+            if((expr[7:1]==7'h7f)&(nrmi[27]))begin
+               rslt[30:0] = 31'h7f800000;
+               flag[2]=1'b1;
+               flag[0]=1'b1;
+            end else begin
+               rslt[30:0] = {expn,nrm4[26:4]}+rnd;
+               flag[0]=|grsn[1:0];
+               flag[1]=(expn==0)&(flag[0]);
+               flag[2]=(rslt[30:23]==8'hff);
+            end
+            rslt[31] = sgn1;
          end else begin
-            rslt[30:0] <= {expn,~nrm4[26:4]}+rnd;
-            rslt[31] <= ~sgn1;
+            rslt[30:0] = {expn,~nrm4[26:4]}+rnd;
+            rslt[31] = ~sgn1;
+            flag[0]=|grsn[1:0];
+            flag[1]=(expn==0)&(flag[0]);
          end
          i <= 0;
       end
    end
 
-   wire [2:0]  grs = {guard[24],guard[23],|guard[22:0]};
+   wire [2:0]  grs = {guard[26],guard[25],|guard[24:0]};
    wire [4:0]  nrmsft;                                        // expr >= nrmsft : subnormal output
    assign nrmsft[4] = (~(|nrmi[25+3:9+3]) |(&nrmi[25+3:9+3]) )& (expr[7:4]!=4'h0);
    assign nrmsft[3] = (~(|nrm0[25+3:17+3])|(&nrm0[25+3:17+3]))&((expr[7:3]&{3'h7, ~nrmsft[4],  1'b1})!=5'h00);

@@ -32,7 +32,8 @@ module fmul
    input         req,
    input [31:0]  x,
    input [31:0]  y,
-   output [31:0] rslt
+   output [31:0] rslt,
+   output [4:0]  flag
    );
 
    reg [9:0]     expr;
@@ -121,13 +122,44 @@ module fmul
                  subn <= 1'b0;
            end
            4: begin
-              rslt[31] <= sgnr;
-              if(expn[9])
-                rslt[30:0] <= 31'h00000000;
-              else if((expn[8:0]>=9'h0ff)&(~expn[9]))
-                rslt[30:0] <= 31'h7f800000;
-              else
-                rslt[30:0] <= {expn,nrm0[54:32]}+rnd;
+              rslt[31] = sgnr;
+              flag=0;
+              if((x[30:23]==8'hff)&(x[22:0]!=0))begin
+                 rslt = x|32'h00400000;
+                 flag[4]=~x[22]|((y[30:23]==8'hff)&~y[22]&(y[21:0]!=0));
+              end else if((y[30:23]==8'hff)&(y[22:0]!=0))begin
+                 rslt = y|32'h00400000;
+                 flag[4]=~y[22]|((x[30:23]==8'hff)&~x[22]&(x[21:0]!=0));
+              end else if(x[30:23]==8'hff)begin
+                 if(y[30:0]==0)begin
+                    rslt = 32'hffc00000;
+                    flag[4] = 1'b1;
+                 end else begin
+                    rslt[31:0] = {x[31]^y[31],x[30:0]};
+                 end
+              end else if(y[30:23]==8'hff)begin
+                 if(x[30:0]==0)begin
+                    rslt = 32'hffc00000;
+                    flag[4] = 1'b1;
+                 end else begin
+                    rslt[31:0] = {x[31]^y[31],y[30:0]};
+                 end
+              end else if(m[55:0]==0)begin
+                 rslt[30:0] = 31'h00000000;
+              end else if(expn[9])begin
+                 rslt[30:0] = 31'h00000000;
+                 flag[0] = 1'b1;
+                 flag[1] = 1'b1;
+              end else if((expn[8:0]>=9'h0ff)&(~expn[9]))begin
+                 rslt[30:0] = 31'h7f800000;
+                 flag[0] = 1'b1;
+                 flag[2] = 1'b1;
+              end else begin
+                 rslt[30:0] = {expn,nrm0[54:32]}+rnd;
+                 flag[0] = |grsn[1:0];
+                 flag[1] = (expn==0)&(flag[0]);
+                 flag[2] = (rslt[30:23]==8'hff);
+              end
            end
          endcase
          i<=i+1;

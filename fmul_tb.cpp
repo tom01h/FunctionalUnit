@@ -18,7 +18,7 @@ int main(int argc, char **argv, char **env) {
   
   fr x, y;
   int xe, ye;
-  int i, nloop;
+  int i, nloop, flag;
   char *e;
   char vcdfile[VCD_PATH_LENGTH];
 
@@ -34,8 +34,6 @@ int main(int argc, char **argv, char **env) {
     nloop=1;
   }else if(argc==2){
       nloop = atoi(argv[1]);
-  }else{
-      nloop = 1000;
   }
   
   Verilated::commandArgs(argc, argv);
@@ -46,21 +44,20 @@ int main(int argc, char **argv, char **env) {
   tfp->open(vcdfile);
   vluint64_t main_time = 0;
   //  while (!Verilated::gotFinish()) {
-  while (i<nloop) {
+  while ((i<nloop)|(argc==1)) {
     verilator_top->reset = ((main_time%1000) < 100) ? 1 : 0;
     verilator_top->req   = ((main_time%1000) < 200) ? 1 : 0;
     if((main_time>0)&((main_time%1000)==0)){
       rslt.i = verilator_top->rslt;
-      expect.f = x.f * y.f;
-      if(expect.i==rslt.i){
-        printf("PASSED %04d : %08x * %08x = %08x\n",i,x.i,y.i,rslt.i);
+      if((expect.i==rslt.i)&((flag==-1)|(flag==verilator_top->flag))){
+        printf("PASSED %04d : %08x * %08x = %08x .. %02x\n",i,x.i,y.i,rslt.i,flag&0xff);
       }else{
-        printf("FAILED %04d : %08x * %08x = %08x != %08x\n",i,x.i,y.i,expect.i,rslt.i);
+        printf("FAILED %04d : %08x * %08x = %08x .. %02x != %08x .. %02x\n",i,x.i,y.i,expect.i,flag&0xff,rslt.i,verilator_top->flag);
       }
       i++;
     }
     if((main_time%1000)==0){
-      if(argc!=3){
+      if(argc==2){
         x.i = (rand()<<1)^rand();
         y.i = (rand()<<1)^rand();
         xe = (x.i>>23)&0xff;
@@ -72,6 +69,14 @@ int main(int argc, char **argv, char **env) {
         if(ye<0){ye=0;}
         if(ye>254){ye=254;}
         y.i = y.i&0x807fffff|(ye<<23);
+        expect.f = x.f * y.f;
+        flag = -1;
+      }else if(argc==1){
+        if(scanf("%08x %08x %08x %02x", &x.i, &y.i, &expect.i, &flag)==EOF){
+          break;}
+      }else{
+        expect.f = x.f * y.f;
+        flag = -1;
       }
       verilator_top->x = x.i;
       verilator_top->y = y.i;
@@ -81,7 +86,8 @@ int main(int argc, char **argv, char **env) {
     if (main_time % 100 == 50)
       verilator_top->clk = 1;
     verilator_top->eval();
-    tfp->dump(main_time);
+    if(argc!=1){
+      tfp->dump(main_time);}
     main_time += 50;
   }
   delete verilator_top;
