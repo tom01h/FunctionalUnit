@@ -16,6 +16,7 @@ module fadd
    reg [25:0]    fracr;
 
    wire [25+3:0] nrmi,nrm0,nrm1,nrm2,nrm3,nrm4;
+   wire [1:0]    ssn;
    wire          rnd;
    wire [7:0]    expn;
 
@@ -80,7 +81,7 @@ module fadd
             end else begin
                rslt[30:0] = {expn,nrm4[26:4]}+rnd;
                flag[0]=|grsn[1:0];
-               flag[1]=(rslt[30:23]==8'h00)&(flag[0]);
+               flag[1]=((rslt[30:23]==8'h00)|((expn[7:0]==8'h00)&~ssn[1]))&(flag[0]);
                flag[2]=(rslt[30:23]==8'hff);
             end
             rslt[31] = sgn1;
@@ -88,7 +89,7 @@ module fadd
             rslt[30:0] = {expn,~nrm4[26:4]}+rnd;
             rslt[31] = ~sgn1;
             flag[0]=|grsn[1:0];
-            flag[1]=(rslt[30:23]==8'h00)&(flag[0]);
+            flag[1]=((rslt[30:23]==8'h00)|((expn[7:0]==8'h00)&((~ssn[1]&~ssn[0])|(ssn[1]&ssn[0])) ))&(flag[0]);
          end
          i <= 0;
       end
@@ -108,7 +109,8 @@ module fadd
    assign nrm2 = (~nrmsft[2]) ? nrm1 : {nrm1[21+3:0], 4'h0};
    assign nrm3 = (~nrmsft[1]) ? nrm2 : {nrm2[23+3:0], 2'b00};
    assign nrm4 = (~nrmsft[0]) ? nrm3 : {nrm3[24+3:0], 1'b0};
-   wire [2:0]  grsn = {nrm4[4:3],|nrm4[2:0]};
+   assign ssn = {nrm4[2],(|nrm4[1:0])};
+   wire [2:0]  grsn = {nrm4[4:3],|ssn};
    assign rnd = (~nrmi[28]) ? (grsn[1:0]==2'b11)|(grsn[2:1]==2'b11)
                             : ((grsn[1:0]==2'b00)|                          // inc
                                ((grsn[1]^grsn[0])     &(grsn[0]))|          // rs=11

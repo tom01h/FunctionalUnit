@@ -48,6 +48,7 @@ module fmadd
    wire [24:0]   fracz = {(z[30:23]!=8'h00),z[22:0]};
 
    wire [56:0]   nrmi,nrm0,nrm1,nrm2,nrm3,nrm4,nrm5;
+   wire [1:0]    ssn;
    wire          rnd;
    wire [9:0]    expn;
 
@@ -195,12 +196,12 @@ module fmadd
               end else if(~nrm0[56])begin
                  rslt[30:0] = {expn,nrm0[54:32]}+rnd;
                  flag[0]=|grsn[1:0];
-                 flag[1]=(rslt[30:23]==8'h00)&(flag[0]);
+                 flag[1]=((rslt[30:23]==8'h00)|((expn[7:0]==8'h00)&~ssn[1]))&(flag[0]);
                  flag[2]=(rslt[30:23]==8'hff);
               end else begin
                  rslt[30:0] = {expn,~nrm0[54:32]}+rnd;
                  flag[0]=|grsn[1:0];
-                 flag[1]=(rslt[30:23]==8'h00)&(flag[0]);
+                 flag[1]=((rslt[30:23]==8'h00)|((expn[7:0]==8'h00)&((~ssn[1]&~ssn[0])|(ssn[1]&ssn[0])) ))&(flag[0]);
               end
            end
          endcase
@@ -227,7 +228,8 @@ module fmadd
    assign nrm2 = (~nrmsft[2]) ? nrm3 : {nrm3[52:0], 4'h0};
    assign nrm1 = (~nrmsft[1]) ? nrm2 : {nrm2[54:0], 2'b00};
    assign nrm0 = (~nrmsft[0]) ? nrm1 : {nrm1[55:0], 1'b0};
-   wire [2:0]  grsn = {nrm0[32:31],(|nrm0[30:0])};
+   assign ssn = {nrm0[30],(|nrm0[29:0])};
+   wire [2:0]  grsn = {nrm0[32:31],(|ssn)};
 
    assign rnd = (~nrmi[56]) ? (grsn[1:0]==2'b11)|(grsn[2:1]==2'b11)
                             : ((grsn[1:0]==2'b00)|                          // inc
