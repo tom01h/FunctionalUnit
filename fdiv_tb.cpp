@@ -45,9 +45,9 @@ int main(int argc, char **argv, char **env) {
   vluint64_t main_time = 0;
   //  while (!Verilated::gotFinish()) {
   while ((i<nloop)|(argc==1)) {
-    verilator_top->reset = ((main_time%2000) < 100) ? 1 : 0;
-    verilator_top->req   = ((main_time%2000) < 200) ? 1 : 0;
-    if((main_time>0)&((main_time%2000)==0)){
+    verilator_top->reset = ((main_time%3000) < 100) ? 1 : 0;
+    verilator_top->req   = ((main_time%3000) < 200) ? 1 : 0;
+    if((main_time>0)&((main_time%3000)==0)){
       rslt.i = verilator_top->rslt;
       if((expect.i==rslt.i)&((flag==-1)|(flag==verilator_top->flag))){
         printf("PASSED %04d : %08x / %08x = %08x .. %02x\n",i,x.i,y.i,rslt.i,flag&0xff);
@@ -56,7 +56,7 @@ int main(int argc, char **argv, char **env) {
       }
       i++;
     }
-    if((main_time%2000)==0){
+    if((main_time%3000)==0){
       if(argc==2){
         x.i = (rand()<<1)^rand();
         y.i = (rand()<<1)^rand();
