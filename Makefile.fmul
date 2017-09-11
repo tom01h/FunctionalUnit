@@ -19,6 +19,8 @@ VERILATOR_MAKE_OPTS = OPT_FAST="-O3"
 
 DESIGN_SRCS = \
 fmul.v \
+vscale_md_constants.vh \
+vscale_mul_div.v \
 
 VERILATOR_CPP_TB = fmul_tb.cpp
 

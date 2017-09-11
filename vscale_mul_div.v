@@ -110,17 +110,17 @@ module vscale_mul_div
 ///////////////// FPU Only vvvvvvvvvvvvvvvvvvvvvvvvvvvv
    reg           fpu_ex;
    reg           sgn1, sgn0;
-   reg [8:0]     expr;
-   reg [9:0]     expd;
+   reg [9:0]     expr, expd;
+   reg           subn;
 
    wire [7:0]    expx = (req_in_1[30:23]==8'h00) ? 8'h01 : req_in_1[30:23];
    wire [7:0]    expy = (req_in_2[30:23]==8'h00) ? 8'h01 : req_in_2[30:23];
    wire [7:0]    expz = (req_in_3[30:23]==8'h00) ? 8'h01 : req_in_3[30:23];
-   wire [8:0]    expm = expx + expy - 127;
+   wire [9:0]    expm = expx + expy - 127;
    wire [9:0]    exps = ( ((req_op==`MDF_OP_FAD)|(req_op==`MDF_OP_FSB)) ? {1'b0,expx}-{1'b0,expy} :
-                          (req_op==`MDF_OP_FML) ? {1'b0,expm} :
+                          (req_op==`MDF_OP_FML) ? expm :
                           ((req_op==`MDF_OP_FMA)|(req_op==`MDF_OP_FNA)|
-                           (req_op==`MDF_OP_FMS)|(req_op==`MDF_OP_FNS)) ? {1'b0,expm} - {1'b0,expz} :
+                           (req_op==`MDF_OP_FMS)|(req_op==`MDF_OP_FNS)) ? expm - {1'b0,expz} :
                           {9{1'bx}});
 
    reg [25:0]    fracr;
@@ -137,7 +137,7 @@ module vscale_mul_div
    assign nrmsft[1] = (~(|nrm2[56:54])|(&nrm2[56:54]))&((expr[8:1]&{3'h7,~nrmsft[5:2],1'b1})!=8'h00);
    assign nrmsft[0] = (~(|nrm1[56:55])|(&nrm1[56:55]))&((expr[8:0]&{3'h7,~nrmsft[5:1],1'b1})!=9'h000);
 
-   assign nrmi = {fracr,guard};   //(subn) ? {1'b0,{26{1'b0}},m[55:27],(|m[26:0])} : //TEMP//TEMP//
+   assign nrmi = (subn) ? {{26{1'b0}},fracr,guard[30:27],(|guard[26:0])} : {fracr,guard};
    assign nrm5 = (~nrmsft[5]) ? nrmi : {nrmi[24:0], 32'h0000};
    assign nrm4 = (~nrmsft[4]) ? nrm5 : {nrm5[40:0], 16'h0000};
    assign nrm3 = (~nrmsft[3]) ? nrm4 : {nrm4[48:0], 8'h00};
@@ -151,7 +151,7 @@ module vscale_mul_div
                             : ((grsn[1:0]==2'b00)|                          // inc
                                ((grsn[1]^grsn[0])     &(grsn[0]))|          // rs=11
                                ((grsn[2]^(|grsn[1:0]))&(grsn[1]^grsn[0]))); // gr=11
-   wire [7:0]  expn = expr-nrmsft+(nrm0[56]^nrm0[55]); // subnormal(+0) or normal(+1)
+   wire [9:0]  expn = expr-nrmsft+(nrm0[56]^nrm0[55]); // subnormal(+0) or normal(+1)
 
    always @(*)begin
       fflag=0;
@@ -160,21 +160,26 @@ module vscale_mul_div
          fflag[4:2] = buf0[29:27];
       end else if({fracr,guard}==0)begin
          frslt[31:0] = {sgn0&sgn1,31'h0};//TEMP//TEMP//not pipe
+      end else if(expn[9])begin
+         frslt[31] = sgn1;//TEMP//TEMP//not pipe
+         frslt[30:0] = 31'h00000000;
+         fflag[0] = 1'b1;
+         fflag[1] = 1'b1;
       end else if(~nrmi[56])begin
          fflag[0]=|grsn[1:0];
-         if((expr[8:1]==8'h83)&(nrmi[47]))begin
+         if((expn[8:0]>=9'h0ff)&(~expn[9]))begin
             frslt[30:0] = 31'h7f800000;
             fflag[2]=1'b1;
             fflag[0]=1'b1;
          end else begin
-            frslt[30:0] = {expn,nrm0[54:32]}+rnd;
+            frslt[30:0] = {expn[7:0],nrm0[54:32]}+rnd;
             fflag[0]=|grsn[1:0];
             fflag[1]=((frslt[30:23]==8'h00)|((expn[7:0]==8'h00)&~ssn[1]))&(fflag[0]);
             fflag[2]=(frslt[30:23]==8'hff);
          end
          frslt[31] = sgn1;//TEMP//TEMP//not pipe
       end else begin
-         frslt[30:0] = {expn,~nrm0[54:32]}+rnd;
+         frslt[30:0] = {expn[7:0],~nrm0[54:32]}+rnd;
          frslt[31] = ~sgn1;//TEMP//TEMP//not pipe
          fflag[0]=|grsn[1:0];
          fflag[1]=((frslt[30:23]==8'h00)|((expn[7:0]==8'h00)&((~ssn[1]&~ssn[0])|(ssn[1]&ssn[0])) ))&(fflag[0]);
@@ -372,9 +377,8 @@ module vscale_mul_div
             endcase
          end else if((req_op==`MDF_OP_FAD)|(req_op==`MDF_OP_FSB)) begin // req cycle FPU ADD SUB
             resp_valid <= 1'b1;
-            buf0 <= out0;
-//            {fpu_ex,buf0[31:0]} <= FAD_TYPE({(req_in_1[31]^(req_op==`MDF_OP_FSB)),req_in_1[30:0]}, req_in_2[31:0]);
             {fpu_ex,buf0[31:0]} <= FAD_TYPE(req_in_1[31:0],req_in_2[31:0],(req_op==`MDF_OP_FSB));
+            subn <= 0;
 
             if(~exps[9])begin
                sgn1 <= req_in_2[31]^(req_op==`MDF_OP_FSB);
@@ -394,9 +398,10 @@ module vscale_mul_div
                {xh,xl[31:0]}      <= {1'b0,(req_in_2[30:23]!=8'h00),req_in_2[22:0],23'h0};
             end
          end else if(req_op==`MDF_OP_FML) begin // req cycle FPU MUL
-            fpu_ex <= 1'b0;
-            //TEMP//TEMP//special case
+            {fpu_ex,buf0[31:0]} <= FML_TYPE(req_in_1[31:0],req_in_2[31:0]);
+
             i<=5;
+            sgn0 <= req_in_1[31]^req_in_2[31];
             sgn1 <= req_in_1[31]^req_in_2[31];
             expr <= exps;
             xh<={8'h00,(req_in_1[30:23]!=8'h00),req_in_1[22:0]};
@@ -454,7 +459,13 @@ module vscale_mul_div
             {fracr[25:0],guard[30:0]} <= {out2[24:0],out1[31:0]}; //TEMP//TEMP//TEMP// out0
             resp_valid <= 1'b1;
             i<=0;
+            if((expr==0)|expr[9])begin
+               expr <= expr+26;
+               subn <= 1'b1;
+            end else
+              subn <= 1'b0;
          end else if(((op==`MDF_OP_FMA)|(op==`MDF_OP_FNA)|(op==`MDF_OP_FMS)|(op==`MDF_OP_FNS))&(i==2))begin
+            subn <= 1'b0;
             if(expd[9])begin
                expd <= -expd;
                {xh,xl[31:0]}<={1'b0,xl[31:0],31'h0};
@@ -533,6 +544,70 @@ module vscale_mul_div
                         };
          end else begin
             FAD_TYPE = 33'h0;
+         end
+      end
+   endfunction
+
+   function [32:0] FML_TYPE
+     (
+      input [31:0] in_1,
+      input [31:0] in_2
+      );
+      begin
+         if((in_1[30:23]==8'hff)&(in_1[22:0]!=0))begin
+            FML_TYPE = {1'b1,                                //fpu_ex
+                        in_1[31],                            //[31] : sign
+                        in_1[30],                            //[30] : exp
+                        ~in_1[22]|((in_2[30:23]==8'hff)&~in_2[22]&(in_2[21:0]!=0)), //[29] : Invalid
+                        6'h00,                               //[28:23]
+                        in_1[22:0]|23'h400000
+                        };
+         end else if((in_2[30:23]==8'hff)&(in_2[22:0]!=0))begin
+            FML_TYPE = {1'b1,                                //fpu_ex
+                        in_2[31],                            //[31] : sign
+                        in_2[30],                            //[30] : exp
+                        ~in_2[22]|((in_1[30:23]==8'hff)&~in_1[22]&(in_1[21:0]!=0)), //[29] : Invalid
+                        6'h00,                               //[28:23]
+                        in_2[22:0]|23'h400000
+                        };
+         end else if(in_1[30:23]==8'hff)begin
+            if(in_2[30:0]==0)begin
+               FML_TYPE = {1'b1,                                //fpu_ex
+//                         1'b0,                                //[31] : sign//TEMP//TEMP//risc-v
+                           1'b1,                                //[31] : sign//TEMP//TEMP//test float
+                           1'b1,                                //[30] : exp
+                           1'b1,                                //[29] : Invalid
+                           6'h00,                               //[28:23]
+                           23'h400000
+                           };
+            end else begin
+               FML_TYPE = {1'b1,                                //fpu_ex
+                           in_1[31]^in_2[31],                   //[31] : sign
+                           in_1[30],                            //[30] : exp
+                           7'h00,                               //[29:23]
+                           in_1[22:0]
+                           };
+            end
+         end else if(in_2[30:23]==8'hff)begin
+            if(in_1[30:0]==0)begin
+               FML_TYPE = {1'b1,                                //fpu_ex
+//                         1'b0,                                //[31] : sign//TEMP//TEMP//risc-v
+                           1'b1,                                //[31] : sign//TEMP//TEMP//test float
+                           1'b1,                                //[30] : exp
+                           1'b1,                                //[29] : Invalid
+                           6'h00,                               //[28:23]
+                           23'h400000
+                           };
+            end else begin
+               FML_TYPE = {1'b1,                                //fpu_ex
+                           in_2[31]^in_1[31],                   //[31] : sign
+                           in_2[30],                            //[30] : exp
+                           7'h00,                               //[29:23]
+                           in_2[22:0]
+                           };
+            end
+         end else begin
+            FML_TYPE = 33'h0;
          end
       end
    endfunction
