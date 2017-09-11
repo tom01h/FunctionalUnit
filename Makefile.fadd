@@ -19,6 +19,8 @@ VERILATOR_MAKE_OPTS = OPT_FAST="-O3"
 
 DESIGN_SRCS = \
 fadd.v \
+vscale_md_constants.vh \
+vscale_mul_div.v \
 
 VERILATOR_CPP_TB = fadd_tb.cpp
 
