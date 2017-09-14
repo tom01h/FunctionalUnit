@@ -535,8 +535,11 @@ module vscale_mul_div
          end else if((in_1[30:23]==8'hff)&(in_2[30:23]==8'hff))begin
             if(in_1[31]^in_2[31]^op)begin
                FAD_TYPE = {2'b11,                               //fpu_ex
-//                         1'b0,                                //[31] : sign//TEMP//TEMP//risc-v
-                           1'b1,                                //[31] : sign//TEMP//TEMP//test float
+`ifdef RISCV
+                           1'b0,                                //[31] : sign
+`else
+                           1'b1,                                //[31] : sign
+`endif
                            1'b1,                                //[30] : exp
                            1'b1,                                //[29] : Invalid
                            6'h00,                               //[28:23]
@@ -595,8 +598,11 @@ module vscale_mul_div
          end else if(in_1[30:23]==8'hff)begin
             if(in_2[30:0]==0)begin
                FML_TYPE = {2'b11,                               //fpu_ex
-//                         1'b0,                                //[31] : sign//TEMP//TEMP//risc-v
-                           1'b1,                                //[31] : sign//TEMP//TEMP//test float
+`ifdef RISCV
+                           1'b0,                                //[31] : sign
+`else
+                           1'b1,                                //[31] : sign
+`endif
                            1'b1,                                //[30] : exp
                            1'b1,                                //[29] : Invalid
                            6'h00,                               //[28:23]
@@ -613,8 +619,11 @@ module vscale_mul_div
          end else if(in_2[30:23]==8'hff)begin
             if(in_1[30:0]==0)begin
                FML_TYPE = {2'b11,                               //fpu_ex
-//                         1'b0,                                //[31] : sign//TEMP//TEMP//risc-v
-                           1'b1,                                //[31] : sign//TEMP//TEMP//test float
+`ifdef RISCV
+                           1'b0,                                //[31] : sign
+`else
+                           1'b1,                                //[31] : sign
+`endif
                            1'b1,                                //[30] : exp
                            1'b1,                                //[29] : Invalid
                            6'h00,                               //[28:23]
@@ -664,8 +673,11 @@ module vscale_mul_div
          end else if(((in_1[30:23]==8'hff)&(in_2[30:0]==0))|
                      ((in_2[30:23]==8'hff)&(in_1[30:0]==0)))begin
             FMA_TYPE = {2'b11,                               //fpu_ex
-//                      1'b0,                                //[31] : sign//TEMP//TEMP//risc-v
-                        1'b1,                                //[31] : sign//TEMP//TEMP//test float
+`ifdef RISCV
+                           1'b0,                                //[31] : sign
+`else
+                           1'b1,                                //[31] : sign
+`endif
                         1'b1,                                //[30] : exp
                         1'b1,                                //[29] : Invalid
                         6'h00,                               //[28:23]
@@ -681,10 +693,13 @@ module vscale_mul_div
                         in_3[22:0]|23'h400000
                         };
          end else if(((in_1[30:23]==8'hff)|(in_2[30:23]==8'hff))&(in_3[30:23]==8'hff))begin
-            if(in_1[31]^in_2[31]!=in_3[31])begin
+            if(in_1[31]^in_2[31]^opm!=in_3[31]^opa)begin
                FMA_TYPE = {2'b11,                               //fpu_ex
-//                         1'b0,                                //[31] : sign//TEMP//TEMP//risc-v
-                           1'b1,                                //[31] : sign//TEMP//TEMP//test float
+`ifdef RISCV
+                           1'b0,                                //[31] : sign
+`else
+                           1'b1,                                //[31] : sign
+`endif
                            1'b1,                                //[30] : exp
                            1'b1,                                //[29] : Invalid
                            6'h00,                               //[28:23]
@@ -693,28 +708,28 @@ module vscale_mul_div
             end else begin
                FMA_TYPE = {2'b11,                               //fpu_ex
                            in_3[31],                            //[31] : sign
-                           in_3[30],                            //[30] : exp
+                           in_3[30]^opa,                        //[30] : exp
                            7'h00,                               //[29:23]
                            in_3[22:0]
                            };
             end
          end else if(in_1[30:23]==8'hff)begin
             FMA_TYPE = {2'b11,                               //fpu_ex
-                        in_1[31]^in_2[31],                   //[31] : sign
+                        in_1[31]^in_2[31]^opm,               //[31] : sign
                         in_1[30],                            //[30] : exp
                         7'h00,                               //[29:23]
                         in_1[22:0]
                         };
          end else if(in_2[30:23]==8'hff)begin
             FMA_TYPE = {2'b11,                               //fpu_ex
-                        in_2[31]^in_1[31],                   //[31] : sign
+                        in_2[31]^in_1[31]^opm,               //[31] : sign
                         in_2[30],                            //[30] : exp
                         7'h00,                               //[29:23]
                         in_2[22:0]
                         };
          end else if(in_3[30:23]==8'hff)begin
             FMA_TYPE = {2'b11,                               //fpu_ex
-                        in_3[31],                            //[31] : sign
+                        in_3[31]^opa,                        //[31] : sign
                         in_3[30],                            //[30] : exp
                         7'h00,                               //[29:23]
                         in_3[22:0]
@@ -722,13 +737,13 @@ module vscale_mul_div
          end else if((in_1[30:0]==0)|(in_2[30:0]==0))begin
             if(in_3[30:0]==0)begin
                FMA_TYPE = {2'b01,                               //fpu_ex
-                           in_3[31]&(in_1[31]^in_2[31]),        //[31] : sign
+                           (in_3[31]^opa)&(in_1[31]^in_2[31]^opm),  //[31] : sign
                            in_3[30:23],                         //[30:23] : exp
                            in_3[22:0]
                            };
             end else begin
                FMA_TYPE = {2'b01,                               //fpu_ex
-                           in_3[31],                            //[31] : sign
+                           in_3[31]^opa,                        //[31] : sign
                            in_3[30:23],                         //[30:23] : exp
                            in_3[22:0]
                            };
