@@ -1,3 +1,7 @@
+`define MDF_OP_WIDTH 4
+`define MDF_OP_FMA `MDF_OP_WIDTH'h8
+`define MD_OUT_HI  1'b1
+/*
 module booth
   (
    input         i,
@@ -24,7 +28,7 @@ module booth
       else  bx[35:33] = {~S,S,S};
    end
 endmodule
-
+*/
 module fmadd
   (
    input         clk,
@@ -37,6 +41,38 @@ module fmadd
    output [4:0]  flag
    );
 
+   reg           respv, respvl;
+   reg [31:0]    resp_fresult;
+   reg [4:0]     resp_fflag;
+
+   always @ (posedge clk)begin
+      respvl <= respv;
+      if(respvl)begin
+         rslt <= resp_fresult;
+         flag <= resp_fflag;
+      end
+   end
+
+   vscale_mul_div md(
+                     .clk(clk),
+                     .reset(reset),
+                     .req_valid(req),
+                     .req_ready(),
+                     .req_in_1_signed(1'b0),
+                     .req_in_2_signed(1'b0),
+                     .req_out_sel(`MD_OUT_HI),
+                     .req_op(`MDF_OP_FMA),
+                     .req_rm(),
+                     .req_in_1(x),
+                     .req_in_2(y),
+                     .req_in_3(z),
+                     .resp_valid(respv),
+                     .resp_result(),
+                     .resp_fbypass(),
+                     .resp_fresult(resp_fresult),
+                     .resp_fflag(resp_fflag)
+                     );
+/*
    reg [9:0]     expr;
    reg [9:0]     expd;
    wire          sgnm = x[31]^y[31];
@@ -236,5 +272,5 @@ module fmadd
                                ((grsn[1]^grsn[0])     &(grsn[0]))|          // rs=11
                                ((grsn[2]^(|grsn[1:0]))&(grsn[1]^grsn[0]))); // gr=11
    assign expn = expr-nrmsft+{1'b0,(nrm0[56]^nrm0[55])}; // subnormal(+0) or normal(+1)
-
+*/
 endmodule
