@@ -118,10 +118,35 @@ module vscale_mul_div
    wire [7:0]    expz = (req_in_3[30:23]==8'h00) ? 8'h01 : req_in_3[30:23];
    wire [9:0]    expm = expx + expy - 127;
    wire [9:0]    exps = ( ((req_op==`MDF_OP_FAD)|(req_op==`MDF_OP_FSB)) ? {1'b0,expx}-{1'b0,expy} :
-//                          (req_op==`MDF_OP_FML) ? expm :
                           ((req_op==`MDF_OP_FMA)|(req_op==`MDF_OP_FNA)|
                            (req_op==`MDF_OP_FMS)|(req_op==`MDF_OP_FNS)) ? expm - {1'b0,expz} :
                           {9{1'bx}});
+
+   reg [96:0]    aligni, aligno;
+   reg [4:0]     alignd;
+
+   always @(*)begin
+      if(((op==`MDF_OP_FMA)|(op==`MDF_OP_FNA)|(op==`MDF_OP_FMS)|(op==`MDF_OP_FNS))&(i==2))begin
+         aligni = {1'b0,xl[31:0],31'h0};
+         if(expd[9])begin
+            alignd = 0;
+         end else if(expd<32)begin
+            alignd = expd;
+         end else if(expd<55)begin
+            alignd = expd-32;
+         end else begin
+            alignd = 55-32;
+         end
+      end else begin
+         aligni =  {1'b0,buf2[30:0],buf1[31:0],32'h0};
+         if(expd<32)begin
+            alignd = expd;
+         end else begin
+            alignd = 31;
+         end
+      end
+      aligno = aligni >> alignd;
+   end
 
    reg [25:0]    fracr;
    reg [30:0]    guard;
@@ -308,24 +333,14 @@ module vscale_mul_div
                {in21[32:0],in11[31:0],in01[31:0]} = ({1'b0,buf2[30:0],buf1[31:0],32'h0});
                {in22[32:0],in12[31:0],in02[31:0]} =  {{33{1'b0}},{32{1'b0}},{31{1'b0}},1'b0};
             end
-         end else if(expd>=27)begin
-            if(sgn0^sgn1)begin
-               {in20[32:0],in10[31:0],in00[31:0]} =~({1'b0,xh[31:0],xl[31:0],32'h0});
-               {in21[32:0],in11[31:0],in01[31:0]} = ({1'b0,buf2[30:0],buf1[31:0],32'h0}>>27);
-               {in22[32:0],in12[31:0],in02[31:0]} =  {{33{1'b0}},{32{1'b0}},{31{1'b0}},1'b1};
-            end else begin
-               {in20[32:0],in10[31:0],in00[31:0]} = ({1'b0,xh[31:0],xl[31:0],32'h0});
-               {in21[32:0],in11[31:0],in01[31:0]} = ({1'b0,buf2[30:0],buf1[31:0],32'h0}>>27);
-               {in22[32:0],in12[31:0],in02[31:0]} =  {{33{1'b0}},{32{1'b0}},{31{1'b0}},1'b0};
-            end
          end else begin
             if(sgn0^sgn1)begin
                {in20[32:0],in10[31:0],in00[31:0]} =~({1'b0,xh[31:0],xl[31:0],32'h0});
-               {in21[32:0],in11[31:0],in01[31:0]} = ({1'b0,buf2[30:0],buf1[31:0],32'h0}>>expd);
+               {in21[32:0],in11[31:0],in01[31:0]} =  aligno; //{1'b0,buf2[30:0],buf1[31:0],32'h0}>>expd;
                {in22[32:0],in12[31:0],in02[31:0]} =  {{33{1'b0}},{32{1'b0}},{31{1'b0}},1'b1};
             end else begin
                {in20[32:0],in10[31:0],in00[31:0]} = ({1'b0,xh[31:0],xl[31:0],32'h0});
-               {in21[32:0],in11[31:0],in01[31:0]} = ({1'b0,buf2[30:0],buf1[31:0],32'h0}>>expd);
+               {in21[32:0],in11[31:0],in01[31:0]} =  aligno; //{1'b0,buf2[30:0],buf1[31:0],32'h0}>>expd;
                {in22[32:0],in12[31:0],in02[31:0]} =  {{33{1'b0}},{32{1'b0}},{31{1'b0}},1'b0};
             end
          end
@@ -475,7 +490,6 @@ module vscale_mul_div
                i  <= i-1;
             end
          end else if((op==`MDF_OP_FML)&(i==2))begin
-            {fracr[25:0],guard[30:0]} <= {out2[25:0],out1[31:2],(|out1[1:0])};
             resp_valid <= 1'b1;
             i<=0;
             if((expr==0)|expr[9])begin
@@ -487,16 +501,13 @@ module vscale_mul_div
          end else if(((op==`MDF_OP_FMA)|(op==`MDF_OP_FNA)|(op==`MDF_OP_FMS)|(op==`MDF_OP_FNS))&(i==2))begin
             if(expd[9])begin
                expd <= -expd;
-               {xh,xl[31:0]}<={1'b0,xl[31:0],31'h0};
+               {xh,xl[31:0]} <= aligno; //{1'b0,xl[31:0],31'h0};
             end else if(expd<32)begin
                expd <= 0;
-               {xh,xl[31:0]}<={1'b0,xl[31:0],31'h0}>>expd;
-            end else if(expd<55)begin
-               expd <= 10'h200;
-               {xl,xh[31:0]}<={1'b0,xl[31:0],31'h0}>>(expd-32);
+               {xh,xl[31:0]} <= aligno; //{1'b0,xl[31:0],31'h0}>>expd;
             end else begin
                expd <= 10'h200;
-               {xl,xh[31:0]}<={1'b0,xl[31:0],31'h0}>>(55-32);
+               {xl,xh[31:0]} <= aligno; //{1'b0,xl[31:0],31'h0}>>(expd-32);
             end
             i<=i-1;
          end else if(((op==`MDF_OP_FMA)|(op==`MDF_OP_FNA)|(op==`MDF_OP_FMS)|(op==`MDF_OP_FNS))&(i==1)) begin // cont cycle FMADD
