@@ -112,14 +112,13 @@ module vscale_mul_div
                             //TEMP//TEMP//not pipe also buf0 @ fpu_ex=1
    reg           sgn1, sgn0;//TEMP//TEMP//not pipe
    reg [9:0]     expr, expd;
-   reg           subn;
 
    wire [7:0]    expx = (req_in_1[30:23]==8'h00) ? 8'h01 : req_in_1[30:23];
    wire [7:0]    expy = (req_in_2[30:23]==8'h00) ? 8'h01 : req_in_2[30:23];
    wire [7:0]    expz = (req_in_3[30:23]==8'h00) ? 8'h01 : req_in_3[30:23];
    wire [9:0]    expm = expx + expy - 127;
    wire [9:0]    exps = ( ((req_op==`MDF_OP_FAD)|(req_op==`MDF_OP_FSB)) ? {1'b0,expx}-{1'b0,expy} :
-                          (req_op==`MDF_OP_FML) ? expm :
+//                          (req_op==`MDF_OP_FML) ? expm :
                           ((req_op==`MDF_OP_FMA)|(req_op==`MDF_OP_FNA)|
                            (req_op==`MDF_OP_FMS)|(req_op==`MDF_OP_FNS)) ? expm - {1'b0,expz} :
                           {9{1'bx}});
@@ -131,14 +130,19 @@ module vscale_mul_div
    wire [5:0]    nrmsft;                                        // expr >= nrmsft : subnormal output
    wire [56:0]   nrmi,nrm0,nrm1,nrm2,nrm3,nrm4,nrm5;
 
-   assign nrmsft[5] = (~(|nrmi[56:24])|(&nrmi[56:24]))& (expr[8:5]!=4'h0);
-   assign nrmsft[4] = (~(|nrm5[56:40])|(&nrm5[56:40]))&((expr[8:4]&{3'h7,~nrmsft[5],  1'b1})!=5'h00);
-   assign nrmsft[3] = (~(|nrm4[56:48])|(&nrm4[56:48]))&((expr[8:3]&{3'h7,~nrmsft[5:4],1'b1})!=6'h00);
-   assign nrmsft[2] = (~(|nrm3[56:52])|(&nrm3[56:52]))&((expr[8:2]&{3'h7,~nrmsft[5:3],1'b1})!=7'h00);
-   assign nrmsft[1] = (~(|nrm2[56:54])|(&nrm2[56:54]))&((expr[8:1]&{3'h7,~nrmsft[5:2],1'b1})!=8'h00);
-   assign nrmsft[0] = (~(|nrm1[56:55])|(&nrm1[56:55]))&((expr[8:0]&{3'h7,~nrmsft[5:1],1'b1})!=9'h000);
+   assign nrmsft[5] =  (expr[8:5]!=4'h0) & (~(|nrmi[56:24])|(&nrmi[56:24]));
+   assign nrmsft[4] = (((expr[8:4]&{3'h7,~nrmsft[5],  1'b1})!=5'h00) &
+                       ((~nrmsft[5]) ? (~(|nrmi[56:40])|(&nrmi[56:40])) : (~(|nrmi[56-32:40-32])|(&nrmi[56-32:40-32]))));
+   assign nrmsft[3] = (((expr[8:3]&{3'h7,~nrmsft[5:4],1'b1})!=6'h00) &
+                       ((~nrmsft[4]) ? (~(|nrm5[56:48])|(&nrm5[56:48])) : (~(|nrm5[56-16:48-16])|(&nrm5[56-16:48-16]))));
+   assign nrmsft[2] = (((expr[8:2]&{3'h7,~nrmsft[5:3],1'b1})!=7'h00) &
+                       ((~nrmsft[3]) ? (~(|nrm4[56:52])|(&nrm4[56:52])) : (~(|nrm4[56-8:52-8])|(&nrm4[56-8:52-8]))));
+   assign nrmsft[1] = (((expr[8:1]&{3'h7,~nrmsft[5:2],1'b1})!=8'h00) &
+                       ((~nrmsft[2]) ? (~(|nrm3[56:54])|(&nrm3[56:54])) : (~(|nrm3[56-4:54-4])|(&nrm3[56-4:54-4]))));
+   assign nrmsft[0] = (((expr[8:0]&{3'h7,~nrmsft[5:1],1'b1})!=9'h00) &
+                       ((~nrmsft[1]) ? (~(|nrm2[56:55])|(&nrm2[56:55])) : (~(|nrm2[56-2:55-2])|(&nrm2[56-2:55-2]))));
 
-   assign nrmi = (subn) ? {{26{1'b0}},fracr,guard[30:27],(|guard[26:0])} : {fracr,guard};
+   assign nrmi = {fracr,guard};
    assign nrm5 = (~nrmsft[5]) ? nrmi : {nrmi[24:0], 32'h0000};
    assign nrm4 = (~nrmsft[4]) ? nrm5 : {nrm5[40:0], 16'h0000};
    assign nrm3 = (~nrmsft[3]) ? nrm4 : {nrm4[48:0], 8'h00};
@@ -395,7 +399,6 @@ module vscale_mul_div
          end else if((req_op==`MDF_OP_FAD)|(req_op==`MDF_OP_FSB)) begin // req cycle FPU ADD SUB
             resp_valid <= 1'b1;
             {fpu_ex[1:0],buf0[31:0]} <= FAD_TYPE(req_in_1[31:0],req_in_2[31:0],(req_op==`MDF_OP_FSB));
-            subn <= 0;
 
             if(~exps[9])begin
                sgn1 <= req_in_2[31]^(req_op==`MDF_OP_FSB);
@@ -420,7 +423,7 @@ module vscale_mul_div
             i<=5;
             sgn0 <= req_in_1[31]^req_in_2[31];
             sgn1 <= req_in_1[31]^req_in_2[31];
-            expr <= exps+1;
+            expr <= expm+1;
             xh<={8'h00,(req_in_1[30:23]!=8'h00),req_in_1[22:0]};
          end else if((req_op==`MDF_OP_FMA)|(req_op==`MDF_OP_FNA)|(req_op==`MDF_OP_FMS)|(req_op==`MDF_OP_FNS)) begin // req cycle FPU MADD
             {fpu_ex[1:0],buf0[31:0]} <= FMA_TYPE(req_in_1[31:0],req_in_2[31:0],req_in_3[31:0],
@@ -477,11 +480,11 @@ module vscale_mul_div
             i<=0;
             if((expr==0)|expr[9])begin
                expr <= expr+26;
-               subn <= 1'b1;
-            end else
-              subn <= 1'b0;
+               {fracr[25:0],guard[30:0]} <= {26'h0,out2[25:0],out1[31:28],(|out1[27:0])};
+            end else begin
+               {fracr[25:0],guard[30:0]} <= {out2[25:0],out1[31:2],(|out1[1:0])};
+            end
          end else if(((op==`MDF_OP_FMA)|(op==`MDF_OP_FNA)|(op==`MDF_OP_FMS)|(op==`MDF_OP_FNS))&(i==2))begin
-            subn <= 1'b0;
             if(expd[9])begin
                expd <= -expd;
                {xh,xl[31:0]}<={1'b0,xl[31:0],31'h0};
