@@ -128,22 +128,8 @@ module vscale_mul_div
    always @(*)begin
       if(((op==`MDF_OP_FMA)|(op==`MDF_OP_FNA)|(op==`MDF_OP_FMS)|(op==`MDF_OP_FNS))&(i==2))begin
          aligni = {1'b0,xl[31:0],31'h0};
-         if(expd[9])begin
-            alignd = 0;
-         end else if(expd<32)begin
-            alignd = expd;
-         end else if(expd<55)begin
-            alignd = expd-32;
-         end else begin
-            alignd = 55-32;
-         end
       end else begin
          aligni =  {1'b0,buf2[30:0],buf1[31:0],32'h0};
-         if(expd<32)begin
-            alignd = expd;
-         end else begin
-            alignd = 31;
-         end
       end
       aligno = aligni >> alignd;
    end
@@ -153,19 +139,29 @@ module vscale_mul_div
 
 //   wire [2:0]    grs = {guard[30],guard[29],|guard[28:0]};
    wire [5:0]    nrmsft;                                        // expr >= nrmsft : subnormal output
+   reg [2:0]     nrmsft5; // [56:40] / [40:24] / [24:8]
    wire [56:0]   nrmi,nrm0,nrm1,nrm2,nrm3,nrm4,nrm5;
+   wire [5:0]    snci;
+   wire [4:0]    snc5;
+   wire [3:0]    snc4;
+   wire [2:0]    snc3;
+   wire [1:0]    snc2;
+   wire          snc1;
 
-   assign nrmsft[5] =  (expr[8:5]!=4'h0) & (~(|nrmi[56:24])|(&nrmi[56:24]));
-   assign nrmsft[4] = (((expr[8:4]&{3'h7,~nrmsft[5],  1'b1})!=5'h00) &
-                       ((~nrmsft[5]) ? (~(|nrmi[56:40])|(&nrmi[56:40])) : (~(|nrmi[56-32:40-32])|(&nrmi[56-32:40-32]))));
-   assign nrmsft[3] = (((expr[8:3]&{3'h7,~nrmsft[5:4],1'b1})!=6'h00) &
-                       ((~nrmsft[4]) ? (~(|nrm5[56:48])|(&nrm5[56:48])) : (~(|nrm5[56-16:48-16])|(&nrm5[56-16:48-16]))));
-   assign nrmsft[2] = (((expr[8:2]&{3'h7,~nrmsft[5:3],1'b1})!=7'h00) &
-                       ((~nrmsft[3]) ? (~(|nrm4[56:52])|(&nrm4[56:52])) : (~(|nrm4[56-8:52-8])|(&nrm4[56-8:52-8]))));
-   assign nrmsft[1] = (((expr[8:1]&{3'h7,~nrmsft[5:2],1'b1})!=8'h00) &
-                       ((~nrmsft[2]) ? (~(|nrm3[56:54])|(&nrm3[56:54])) : (~(|nrm3[56-4:54-4])|(&nrm3[56-4:54-4]))));
-   assign nrmsft[0] = (((expr[8:0]&{3'h7,~nrmsft[5:1],1'b1})!=9'h00) &
-                       ((~nrmsft[1]) ? (~(|nrm2[56:55])|(&nrm2[56:55])) : (~(|nrm2[56-2:55-2])|(&nrm2[56-2:55-2]))));
+//   assign nrmsft[5] =  snci[5] & (~(|nrmi[56:24])|(&nrmi[56:24]));
+   assign nrmsft[5] =  snci[5] & (&nrmsft5[2:1]);
+   assign nrmsft[4] =  snc5[4] & ((~nrmsft[5]) ? nrmsft5[2] : nrmsft5[0]);
+   assign nrmsft[3] =  snc4[3] & ((~nrmsft[4]) ? (~(|nrm5[56:48])|(&nrm5[56:48])) : (~(|nrm5[56-16:48-16])|(&nrm5[56-16:48-16])));
+   assign nrmsft[2] =  snc3[2] & ((~nrmsft[3]) ? (~(|nrm4[56:52])|(&nrm4[56:52])) : (~(|nrm4[56-8:52-8])|(&nrm4[56-8:52-8])));
+   assign nrmsft[1] =  snc2[1] & ((~nrmsft[2]) ? (~(|nrm3[56:54])|(&nrm3[56:54])) : (~(|nrm3[56-4:54-4])|(&nrm3[56-4:54-4])));
+   assign nrmsft[0] =  snc1    & ((~nrmsft[1]) ? (~(|nrm2[56:55])|(&nrm2[56:55])) : (~(|nrm2[56-2:55-2])|(&nrm2[56-2:55-2])));
+
+   assign snci[5:0] = (expr[8:6]!=3'h0)    ? 6'h3f : expr[5:0];
+   assign snc5[4:0] = (snci[5]&~nrmsft[5]) ? 5'h1f : snci[4:0];
+   assign snc4[3:0] = (snc5[4]&~nrmsft[4]) ? 4'hf  : snc5[3:0];
+   assign snc3[2:0] = (snc4[3]&~nrmsft[3]) ? 3'h7  : snc4[2:0];
+   assign snc2[1:0] = (snc3[2]&~nrmsft[2]) ? 2'h3  : snc3[1:0];
+   assign snc1      = (snc2[1]&~nrmsft[1]) ? 1'h1  : snc2[0];
 
    assign nrmi = {fracr,guard};
    assign nrm5 = (~nrmsft[5]) ? nrmi : {nrmi[24:0], 32'h0000};
@@ -423,6 +419,11 @@ module vscale_mul_div
                sgn0 <= req_in_1[31];
                expr <= expx+9;
                expd <= exps;
+               if(exps<32)begin
+                  alignd <= exps;
+               end else begin
+                  alignd <= 31;
+               end
                buf1[32]<=1'b0;
                {xh,xl[31:0]}      <= {1'b0,(req_in_1[30:23]!=8'h00),req_in_1[22:0],23'h0};
                {buf2, buf1[31:0]} <= {1'b0,(req_in_2[30:23]!=8'h00),req_in_2[22:0],23'h0};
@@ -431,6 +432,11 @@ module vscale_mul_div
                sgn1 <= req_in_1[31];
                expr <= expy+9;
                expd <=-exps;
+               if(exps>11'h400-32)begin
+                  alignd <= -exps;
+               end else begin
+                  alignd <= 31;
+               end
                buf1[32]<=1'b0;
                {buf2, buf1[31:0]} <= {1'b0,(req_in_1[30:23]!=8'h00),req_in_1[22:0],23'h0};
                {xh,xl[31:0]}      <= {1'b0,(req_in_2[30:23]!=8'h00),req_in_2[22:0],23'h0};
@@ -463,6 +469,16 @@ module vscale_mul_div
       end else begin
          if(((op==`MDF_OP_MUL)&(i>0))|((op==`MDF_OP_FML)&(i>2))|
             (((op==`MDF_OP_FMA)|(op==`MDF_OP_FNA)|(op==`MDF_OP_FMS)|(op==`MDF_OP_FNS))&(i>2))) begin // cont cycle MUL
+
+            if(expd[9])begin
+               alignd <= 0;
+            end else if(expd<32)begin
+               alignd <= expd;
+            end else if(expd<55)begin
+               alignd <= expd-32;
+            end else begin
+               alignd <= 55-32;
+            end
 
             ng2 <= (br2[2:1]==2'b10)|(br2[2:0]==3'b110);
             if(i!=2)
@@ -498,27 +514,46 @@ module vscale_mul_div
             if((expr==0)|expr[9])begin
                expr <= expr+26;
                {fracr[25:0],guard[30:0]} <= {26'h0,out2[25:0],out1[31:28],(|out1[27:0])};
+               nrmsft5[2] <=  1'b1;
+               nrmsft5[1] <= ~(|out2[25:19]);
+               nrmsft5[0] <= ~(|out2[19:2]);
             end else begin
                {fracr[25:0],guard[30:0]} <= {out2[25:0],out1[31:2],(|out1[1:0])};
+               nrmsft5[2] <= ~(|out2[25:9]);
+               nrmsft5[1] <= ~(|{out2[8:0],out1[31:25]});
+               nrmsft5[0] <= ~(|out1[25:9]);
             end
          end else if(((op==`MDF_OP_FMA)|(op==`MDF_OP_FNA)|(op==`MDF_OP_FMS)|(op==`MDF_OP_FNS))&(i==2))begin
             if(expd[9])begin
                expd <= -expd;
+               if(expd>11'h400-32)begin
+                  alignd <= -expd;
+               end else begin
+                  alignd <= 31;
+               end
                {xh,xl[31:0]} <= aligno; //{1'b0,xl[31:0],31'h0};
             end else if(expd<32)begin
                expd <= 0;
+               alignd <= 0;
                {xh,xl[31:0]} <= aligno; //{1'b0,xl[31:0],31'h0}>>expd;
             end else begin
                expd <= 10'h200;
+               alignd <= 0;
                {xl,xh[31:0]} <= aligno; //{1'b0,xl[31:0],31'h0}>>(expd-32);
             end
             i<=i-1;
          end else if(((op==`MDF_OP_FMA)|(op==`MDF_OP_FNA)|(op==`MDF_OP_FMS)|(op==`MDF_OP_FNS))&(i==1)) begin // cont cycle FMADD
             {fracr[25:0],guard[30:0]} <= {out2[25:0],out1[31:2],(|out1[1:0])|(|out0[31:0])};
+            nrmsft5[2] <= ~(|out2[25:9])|(&out2[25:9]);
+            nrmsft5[1] <= ~(|{out2[9:0],out1[31:25]})|(&{out2[9:0],out1[31:25]});
+            nrmsft5[0] <= ~(|out1[25:9])|(&out1[25:9]);
             resp_valid <= 1'b1;
             i<=0;
          end else if((op==`MDF_OP_FAD)|(op==`MDF_OP_FSB)) begin // cont cycle FAD FSB
             {fracr[25:0],guard[30:0]} <= {out2[25:0],out1[31:2],(|out1[1:0])|(|out0[31:0])};
+            nrmsft5[2] <= ~(|out2[25:9])|(&out2[25:9]);
+            nrmsft5[1] <= ~(|{out2[9:0],out1[31:25]})|(&{out2[9:0],out1[31:25]});
+            nrmsft5[0] <= ~(|out1[25:9])|(&out1[25:9]);
             if(resp_valid) fop <= op;
          end else if(((op==`MDF_OP_FML)|(op==`MDF_OP_FMA)|(op==`MDF_OP_FNA)|(op==`MDF_OP_FMS)|(op==`MDF_OP_FNS))&(resp_valid))begin
             fop <= op;
